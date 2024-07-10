@@ -41,6 +41,7 @@ io.on("connection", (socket) => {
         sessions[code] = { players: [{ name: name, readyStatus: false, socketId: socket.id}] };
         console.log(`${name} Joining with Code ${code}`);
         socket.emit("room-created", code);
+        socket.emit("player-status", {players: sessions[code].players});
     });
 
     socket.on("join", (data) => {
@@ -54,7 +55,7 @@ io.on("connection", (socket) => {
             console.log(sessions);
             // socket.emit("join-success", {players: sessions[code].players});
             for (let struct of sessions[code].players) {
-                io.to(struct.socketId).emit("join-success", {players: sessions[code].players.map((struct) => struct.name)});
+                io.to(struct.socketId).emit("join-success", {players: sessions[code].players});
             }
         } else {
             console.log("Failure\n");
@@ -68,13 +69,18 @@ io.on("connection", (socket) => {
         for (let struct of sessions[code].players) {
             if (struct.socketId == socket.id) {
                 struct.readyStatus = ready;
-                console.log(struct.name);
             };
         }
         if (allReady(code)) {
             console.log("Sending all ready");
             for (let struct of sessions[code].players) {
                 io.to(struct.socketId).emit("all-ready", "Hello World");
+                io.to(struct.socketId).emit("player-status", {players: sessions[code].players});
+            }
+        }
+        else {
+            for (let struct of sessions[code].players) {
+                io.to(struct.socketId).emit("player-status", {players: sessions[code].players});
             }
         }
     })
