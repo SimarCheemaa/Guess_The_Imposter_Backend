@@ -19,6 +19,17 @@ const io = new Server(server, {
     },
 });
 
+const allReady = (code) => {
+    for (let struct of sessions[code].players) {
+        if (struct.readyStatus == false) {
+            console.log(`${struct.name} Is not ready`);
+            return false;
+        };
+    };
+    console.log("All Ready")
+    return true;
+}
+
 io.on("connection", (socket) => {
     
     console.log(`User Connected: ${socket.id}`);
@@ -26,7 +37,8 @@ io.on("connection", (socket) => {
     socket.on("create", (data) => {
         const code = Math.random().toString(36).substring(2, 7).toUpperCase();
         const name = data.name;
-        sessions[code] = { players: [name], socketIds: [socket.id]};
+        // sessions[code] = { players: [name], socketIds: [socket.id]};
+        sessions[code] = { players: [{ name: name, readyStatus: false, socketId: socket.id}] };
         console.log(`${name} Joining with Code ${code}`);
         socket.emit("room-created", code);
     });
@@ -36,17 +48,34 @@ io.on("connection", (socket) => {
         const name = data.name;
         console.log(`Joining with code ${code} and name ${name}`);
         if (sessions[code]) {
-            sessions[code].players.push(name);
-            sessions[code].socketIds.push(socket.id);
+            sessions[code].players.push({ name: name, readyStatus: false, socketId: socket.id});
+            // sessions[code].socketIds.push(socket.id);
             console.log(`Joined a game with ${sessions[code].players}\n`);
             console.log(sessions);
-            socket.emit("join-success", {players: sessions[code].players});
-            for (let sockId of sessions[code].socketIds) {
-                io.to(sockId).emit("join-success", {players: sessions[code].players});
+            // socket.emit("join-success", {players: sessions[code].players});
+            for (let struct of sessions[code].players) {
+                io.to(struct.socketId).emit("join-success", {players: sessions[code].players.map((struct) => struct.name)});
             }
         } else {
             console.log("Failure\n");
             socket.emit("join-failure", {});
+        }
+    })
+
+    socket.on("ready-up", (data) => {
+        const ready = data.ready;
+        const code = data.code;
+        for (let struct of sessions[code].players) {
+            if (struct.socketId == socket.id) {
+                struct.readyStatus = ready;
+                console.log(struct.name);
+            };
+        }
+        if (allReady(code)) {
+            console.log("Sending all ready");
+            for (let struct of sessions[code].players) {
+                io.to(struct.socketId).emit("all-ready", "Hello World");
+            }
         }
     })
 
